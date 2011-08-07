@@ -1,6 +1,30 @@
-= tivoli
+= Tivoli
 
-Description goes here.
+http://en.wikipedia.org/wiki/Aspect-oriented_programming
+
+== Usage
+
+  t = Tivoli.new(String.instance_method(:upcase))
+  t.complete { |*args, result, manipulated, time|
+    # Do stuff with them here
+  }
+  
+  t = Tivoli.new(String.instance_method(:upcase))
+  t.before { |*args|
+    puts "before"
+    return [:change_result, 'bye'] if args[0] == 'hello'
+  }
+  
+  puts "hello".upcase # => bye
+  
+  t.after { |*args, result, manipulated, time|
+    puts "after"
+    return [:change_result, 'hi again'] if result == 'bye'
+  }
+  
+  puts "hello".upcase # => hi again
+
+
 
 == Contributing to tivoli
  
