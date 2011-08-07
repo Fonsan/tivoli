@@ -17,8 +17,8 @@ Jeweler::Tasks.new do |gem|
   gem.name = "tivoli"
   gem.homepage = "http://github.com/Fonsan/tivoli"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.summary = %Q{AOP in 100 lines of ruby}
+  gem.description = %Q{AOP in 100 lines of ruby}
   gem.email = "fonsan@gmail.com"
   gem.authors = ["Erik Fonselius"]
   # dependencies defined in Gemfile
