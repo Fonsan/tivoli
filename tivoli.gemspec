@@ -29,7 +29,8 @@ Gem::Specification.new do |s|
     "examples/everything.rb",
     "lib/tivoli.rb",
     "spec/spec_helper.rb",
-    "spec/tivoli_spec.rb"
+    "spec/tivoli_spec.rb",
+    "tivoli.gemspec"
   ]
   s.homepage = "http://github.com/Fonsan/tivoli"
   s.licenses = ["MIT"]
