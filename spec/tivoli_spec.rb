@@ -9,53 +9,64 @@ describe Tivoli do
     task = proc { |*args|
       i += 1
     }
-    @t.before &task
-    @t.after &task
-    @t.complete &task
+    @t.aspect :before, &task
+    @t.aspect :after, &task
     "aBc".upcase
-    i.should == 3
+    i.should == 2
   end
-  
-  describe 'manipulation' do
-    it 'should be able to change result on before call' do
-      bool = false
-      Object.instance_eval do
-        define_method :hello do
-          !bool
-        end
+
+
+  describe 'upcase' do
+    it 'should be able to proxy upcase' do
+      t = Tivoli.new(String.instance_method(:upcase))
+      t.filter :after do |prev|
+        prev.reverse
       end
-      t = Tivoli.new Object.instance_method(:hello)
-      o = Object.new
-      bool = o.hello
-      bool.should be_true
-      bool = o.hello
-      bool.should be_false
-      t.before do
-        [:change_result, false]
-      end
-      bool = o.hello
-      bool.should be_false
-    end
-    
-    it 'should be able to change result on after call' do
-      bool = false
-      Object.instance_eval do
-        define_method :hello do
-          !bool
-        end
-      end
-      t = Tivoli.new Object.instance_method(:hello)
-      o = Object.new
-      bool = o.hello
-      bool.should be_true
-      bool = o.hello
-      bool.should be_false
-      t.after do
-        [:change_result, false]
-      end
-      bool = o.hello
-      bool.should be_false
+      "hello".upcase.should == 'OLLEH'
     end
   end
-  
+
+  describe 'String#+' do
+    before :each do
+      @t.stop if @t
+      @t = Tivoli.new(String.instance_method(:+))
+    end
+
+    it 'should log' do
+      log = nil
+      @t.aspect :before do |time, args, &block|
+        # log stuff here or
+        log = "LOG #{args}"
+      end
+      ("hello" + "other").should == 'helloother'
+      log.should == 'LOG ["other"]'
+    end
+
+    it 'should change arguments' do
+      @t.aspect :before do |time, args, &block| 
+        # change arguments
+        args[0].reverse!
+      end
+      ('hello' + 'other').should == 'hellorehto'
+    end
+
+    it 'should chain' do
+
+      @t.filter :before do |prev, time, args, &block| 
+        'nope'
+      end
+      @t.filter :before do |prev|
+        prev.reverse
+      end
+      ('hello' + 'other').should == 'epon'
+    end
+
+    it "should filter after" do
+      @t.filter :after do |prev, time, args, &block|
+        prev + time
+      end
+      "hello" + "other" # => 'helloother0'
+    end
+  end
+   
 end

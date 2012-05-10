@@ -1,81 +1,76 @@
-require 'bundler/setup'
 class Tivoli
-  attr_reader :method, :before_callbacks, :after_callbacks, :complete_callbacks
+  attr_accessor :method, :filters, :aspects
   
   def self.bench
     start = Time.now.to_f
-    yield
-    time_taken = ((Time.now.to_f - start)*1000).to_i
+    time_passed = proc {
+      time_taken = ((Time.now.to_f - start)*1000).to_i
+    }
+    yield time_passed
+    time_passed.call
+  end
+
+  def run(fallback, &block)
+    key = :"tivoli_#{object_id}"
+    return fallback.call if Thread.current[key]
+    Thread.current[key] = true
+    result = block.call
+    Thread.current[key] = false
+    result
   end
   
   def initialize(method)
     @method = method
-    @after_callbacks = []
-    @before_callbacks = []
-    @complete_callbacks = []
+    default_to_array = proc { |h,k| h[k] = [] }
+    self.aspects = Hash.new(&default_to_array)
+    self.filters = Hash.new(&default_to_array)
+
     tivoli = self
     
-    method.owner.send(:define_method, method.name) do |*args|
-      return method.bind(self)[*args] if Thread.current[:tivoli_callback]
-      before_callbacks = tivoli.before_callbacks
-      after_callbacks = tivoli.after_callbacks
-      complete_callbacks = tivoli.complete_callbacks
+    method.owner.send(:define_method, method.name) do |*args, &blk|
       result = nil
-      before_cancel = after_cancel = false
-      time = Tivoli.bench {
-        message , result = nil, nil
-        before_time = Tivoli.bench {
-          before_callbacks.each do |c|
-            message, result = Tivoli.call_callback(c, *args)
-          end
-        }
-        before_cancel = message == :change_result
-        unless before_cancel
-          call_time = Tivoli.bench {
-            result = method.bind(self)[*args]
-          }
-        end
-        after_result = nil
-        after_cancel = false
-        after_time = 0
-        after_time = Tivoli.bench {
-          after_callbacks.each do |c|
-            after_callback_time = 0
-            after_callback_time += Tivoli.bench {
-              message, after_result = Tivoli.call_callback(c, 
-                args, 
-                after_cancel ? after_result : result,
-                before_cancel || after_cancel,
-                before_cancel ? before_time : call_time + after_callback_time)
-            }
-            after_cancel = message == :change_result
-          end
-        }
-        result = after_result if after_cancel
+
+      call_original_method = proc {
+        method.bind(self)[*args, &blk]
       }
-      complete_callbacks.each do |c|
-        Tivoli.call_callback(c,args, result, before_cancel || after_cancel, time)
+
+      tivoli.run(call_original_method) do
+        time = Tivoli.bench do |time_passed|
+          execute = proc { |state, &block|
+            tivoli.aspects[state].each do |a|
+              a.call(time_passed.call, args, &blk)
+            end
+            if tivoli.filters[state].empty?
+              block.call
+            else
+              tivoli.filters[state].reduce(result) do |prev, f|
+                f.call(prev, time_passed.call, args, &blk)
+              end
+            end
+          }
+          result = execute.call :before, &call_original_method
+          result = execute.call :after do
+            result
+          end
+        end
       end
       result
     end
   end
-  
-  def self.call_callback(c, *args)
-    Thread.current[:tivoli_callback] = true
-    c[*args]
-  ensure
-    Thread.current[:tivoli_callback] = false
+
+  def aspect(state, &block)
+    aspects[state].push(block)
   end
-  
-  def before(&block)
-    @before_callbacks << block
+
+  def filter(state, &block)
+    filters[state].push(block)
   end
-  
-  def after(&block)
-    @after_callbacks << block
-  end
-  
-  def complete(&block)
-    @complete_callbacks << block
+
+  def stop
+    aspects.clear
+    filters.clear
+    method.owner.send(:define_method, method.name) do |*args, &blk|
+      method.bind(self)[*args, &blk]
+    end
   end
 end

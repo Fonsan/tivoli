@@ -4,27 +4,35 @@ http://en.wikipedia.org/wiki/Aspect-oriented_programming
 
 == Usage
 
-  t = Tivoli.new(String.instance_method(:upcase))
-  t.complete { |*args, result, manipulated, time|
-    # Do stuff with them here
+  t = Tivoli.new(String.instance_method(:+))
+  t.aspect :before { |time, args, &block|
+    # log stuff here or
+    puts "LOG #{args}"
   }
-  
-  t = Tivoli.new(String.instance_method(:upcase))
-  t.before { |*args|
-    puts "before"
-    return [:change_result, 'bye'] if args[0] == 'hello'
-  }
-  
-  puts "hello".upcase # => bye
-  
-  t.after { |*args, result, manipulated, time|
-    puts "after"
-    return [:change_result, 'hi again'] if result == 'bye'
-  }
-  
-  puts "hello".upcase # => hi again
+  "hello" + "other" # => 'helloother'
+  LOG ['other']
 
+  t.aspect :before { |time, args, &block| 
+    # change arguments
+    args[0].reverse!
+  }
+  'hello' + 'other' # => 'helloretho'
 
+  # prev is used for chaining multiple filters, first time prev is nil
+  t.filter :before { |prev, time, args, &block| 
+    # change result
+    'nope'
+  }
+  'hello' + 'other' # => 'nope'
+  
+
+  t.aspect :before {
+    sleep 1
+  }
+  t.filter :after { |prev, time, args, &block|
+    prev + time
+  }
+  "hello" + "other" # => 'helloother1000'
 
 == Contributing to tivoli
  
